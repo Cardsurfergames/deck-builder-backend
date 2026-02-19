@@ -6,12 +6,14 @@
  * Tokens expire after 24 hours - this service caches and auto-refreshes them.
  */
 
+const { URLSearchParams } = require('node:url');
+
 let cachedToken = null;
-let tokenExpiresAt = null;
+let tokenExpiresAt = 0;
 
 async function getAccessToken() {
-  // Return cached token if still valid (with 5-minute buffer)
-  if (cachedToken && tokenExpiresAt && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
+  // Return cached token if still valid (with 60-second buffer)
+  if (cachedToken && Date.now() < tokenExpiresAt - 60000) {
     console.log('[SHOPIFY-AUTH] Using cached access token');
     return cachedToken;
   }
@@ -39,9 +41,9 @@ async function getAccessToken() {
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: JSON.stringify({
+    body: new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: clientId,
       client_secret: clientSecret,
@@ -58,12 +60,11 @@ async function getAccessToken() {
 
   const data = await response.json();
   console.log(`[SHOPIFY-AUTH] Token response keys: ${Object.keys(data).join(', ')}`);
+  
   cachedToken = data.access_token;
+  tokenExpiresAt = Date.now() + (data.expires_in || 86399) * 1000;
   
-  // Tokens expire in 24 hours, but we'll refresh at 23 hours to be safe
-  tokenExpiresAt = Date.now() + 23 * 60 * 60 * 1000;
-  
-  console.log(`[SHOPIFY-AUTH] Successfully obtained new access token (expires in ~23h)`);
+  console.log(`[SHOPIFY-AUTH] Successfully obtained new access token (expires in ~${Math.round((data.expires_in || 86399) / 3600)}h)`);
   return cachedToken;
 }
 
