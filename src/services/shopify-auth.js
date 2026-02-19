@@ -6,8 +6,6 @@
  * Tokens expire after 24 hours - this service caches and auto-refreshes them.
  */
 
-const { URLSearchParams } = require('node:url');
-
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
@@ -38,24 +36,25 @@ async function getAccessToken() {
   const tokenUrl = `https://${storeDomain}/admin/oauth/access_token`;
   console.log(`[SHOPIFY-AUTH] Token URL: ${tokenUrl}`);
 
+  const bodyString = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
+  console.log(`[SHOPIFY-AUTH] Request body (redacted): grant_type=client_credentials&client_id=${clientId.substring(0, 8)}...&client_secret=***`);
+
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
+    body: bodyString,
   });
 
   console.log(`[SHOPIFY-AUTH] Response status: ${response.status} ${response.statusText}`);
+  console.log(`[SHOPIFY-AUTH] Response headers content-type: ${response.headers.get('content-type')}`);
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[SHOPIFY-AUTH] Token request failed: ${response.status} - ${errorText}`);
-    throw new Error(`Failed to get access token: ${response.status} - ${errorText}`);
+    console.error(`[SHOPIFY-AUTH] Token request failed: ${response.status}`);
+    console.error(`[SHOPIFY-AUTH] Error response (first 500 chars): ${errorText.substring(0, 500)}`);
+    throw new Error(`Failed to get access token: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
   const data = await response.json();
